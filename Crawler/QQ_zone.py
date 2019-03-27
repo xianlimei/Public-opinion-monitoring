@@ -55,6 +55,7 @@ class QQ_Spider(object):
 			cookie_zone[item["name"]]=item['value']  #拼接cookie为字典
 
 		self.cookie_zone = cookie_zone
+		# print(cookie_zone)
 		#self.headers['Cookie'] = self.cookies
 		self.driver_zone.quit()
 		return cookie_zone
@@ -119,6 +120,7 @@ class QQ_Spider(object):
 		requ = requests.get(url=url2, headers=header)
 		text=requ.text[1:len(requ.text) - 1]  # 去除源数据中的圆括号
 		qq_groups = text[text.find('qqgroups : ') + 11:text.find(',groups :', text.find('qqgroups : '))]  # 截取qqgroups那一块数据
+		# print(qq_groups)
 		sortbyupdatetime = requ.text[requ.text.find('sortbyupdatetime : ') + 19:requ.text.find(',qqgroups :',requ.text.find('sortbyupdatetime : '))]  # 截取sortbyupdatetime那一块数据,为进行qq号转换
 		# print(sortbyupdatetime)
 		qq_groups = re.sub(re.compile('."\0"'), '', qq_groups)  # 除去空字符，防止eval函数报错 该函数不能处理空字符
@@ -127,15 +129,26 @@ class QQ_Spider(object):
 		sortbyupdatetime = re.sub(re.compile('@qq.com'), '', sortbyupdatetime)
 		# print(sortbyupdatetime)
 		sortbyupdatetime = eval(sortbyupdatetime)  # 将字符串转为list
+		# print(type(sortbyupdatetime))
 		for item in qq_groups:
 			print(str(int(item[0]) - 1000000) + ' : ' + item[2])  # 显示分组
+		# for item in sortbyupdatetime:
+		# 	# print(item[0])
+		# 	if int(len(item[0])) < 10 or  re.findall('[a-zA-Z] ',item[0]):
+		# 		sortbyupdatetime.remove(item)
+		# 		print('ok')
 		in_list = []
-		count = 0
+		count=0
+		for group in qq_groups:
+			count=count+len(group[1])
+		count = len(sortbyupdatetime)-count #除去因发送邮件而产生的无效信息
+		# print(count)
 		for group in qq_groups:  #进行qq号转换
 			for num, i in zip(range(0, len(group[1])), range(count, count + len(group[1]))):
 				if str(group[1][num]) == sortbyupdatetime[i][0]:
 					group[1][num] = sortbyupdatetime[i][2]
 					# print(group[1][num])
+					# print(sortbyupdatetime[i][2])
 			count = count + len(group[1])
 		print("加载完成...")
 		print('请选择你要爬取的分组(输入对应分组的索引,可输入多个，以-1结束):')
@@ -148,7 +161,7 @@ class QQ_Spider(object):
 		for i in in_list:
 			for num in qq_groups[i][1]:
 				qq_num.put(num)
-				# print(num)
+				print(num)
 		#print(self.qq_num)
 	def mode_choose(self,qq_num):
 		print("请选择爬取模式：1：指定QQ 2：指定分组 3：混合模式 ")
