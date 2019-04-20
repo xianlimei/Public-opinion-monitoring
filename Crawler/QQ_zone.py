@@ -18,6 +18,7 @@ import os
 import sys
 import recog_captcha
 from requests.adapters import HTTPAdapter
+import datetime
 class QQ_Spider(object):
 	def __init__(self,user,password):
 		'''
@@ -57,7 +58,7 @@ class QQ_Spider(object):
 			if self.driver_zone.current_url !=goal_url and count<=3:
 				time.sleep(1) #等待浏览器加载
 				count=count+1
-			elif self.driver_zone.current_url == goal_url and count>3 :
+			elif self.driver_zone.current_url != goal_url and count>3 :
 				recog_captcha.recog_Verification_code(self.driver_zone)  #进行验证码识别
 				break
 			else:
@@ -208,15 +209,32 @@ class QQ_Spider(object):
 		'''
 		获取g_tk()
 		'''
-		#p_skey = self.cookies[self.cookies.find('p_skey=') + 7: self.cookies.find(';', self.cookies.find('p_skey='))] #若拼接为字符串则使用该方法寻找p_skey find函数返回的是指定目标在字符串中的索引
 		p_skey=self.cookie_zone['p_skey']
 		h = 5381
 		for i in p_skey:
 			h += (h << 5) + ord(i)
 		self.g_tk = h & 2147483647
 		return self.g_tk
-
-def get_info(g_tk,cookie_zone,qq_num):
+	def set_time(self):
+		time_list=[7,30,90,180,365]
+		print("请选择所要爬取的时间段：")
+		for i in range(5):
+			if i==0:
+				print(str(i)+" : "+"近一周")
+			if i==1:
+				print(str(i)+" : "+"近一月")
+			if i==2:
+				print(str(i)+" : "+"近三月")
+			if i==3:
+				print(str(i)+" : "+"近半年")
+			if i==4:
+				print(str(i)+" : "+"近一年")
+		number=int(input())
+		#now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		self.time_set = (datetime.datetime.now()-datetime.timedelta(days=time_list[number])).strftime("%Y-%m-%d %H:%M:%S")#获取时间界限，number是几天
+		#print(time_set)
+		return self.time_set
+def get_info(g_tk,cookie_zone,qq_num,time_set):
 	'''
 	构造说说请求链接
 	正则解析
@@ -274,10 +292,13 @@ def get_info(g_tk,cookie_zone,qq_num):
 							zip(created_time,  contents, comment_content, comments):
 						_comment_content=re.sub(remove_emotion,'',_comment_content)
 						_content = re.sub(remove_emotion, '', _content)
+						current_time=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(re.sub('created_time":', '', _time))))
+						if current_time<time_set:
+							break
 						data = {
 							'nickname':uid_name,
 							'QQ':str(q),
-							'CreateTime': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(re.sub('created_time":', '', _time)))),
+							'CreateTime': current_time,
 							'content': re.sub('],"content":"|"', '', _content),
 							'comment': re.sub('cmtnum":', '', _comment),
 							'comment_content': re.sub('null|commentlist":', '', _comment_content) if 'null' in _comment_content else str([(re.sub('content":"|"', '', x), re.sub('createTime2":"|"', '', y), re.sub('name":"|"', '', z), re.sub('uin":', '', zz)) for x, y, z, zz in zip(re.findall('content":".*?"', _comment_content), re.findall('createTime2":".*?"', _comment_content), re.findall('name":".*?"', _comment_content), re.findall('uin":\d+', _comment_content))]),
@@ -285,9 +306,11 @@ def get_info(g_tk,cookie_zone,qq_num):
 						with open('QQinfo.txt', 'a', encoding='utf-8') as f:  #存储说说信息
 							f.write(str(data) + "\n")
 							f.close()
-							pid = os.getpid()  # 得到当前进程号
+							#pid = os.getpid()  # 得到当前进程号
 							# print('当前进程号：%s   ' % pid)
 							print("写入成功...")
+					if current_time < time_set:
+						break
 					pos += 20
 					time.sleep(random.uniform(4.0, 5.0))
 		else:
@@ -301,6 +324,7 @@ if __name__ == '__main__':
 	password=input('请输入密码: ')
 	process=int(input("请输入要开启的进程数: "))  #设定开启进程
 	qq_zone_crawler = QQ_Spider(user,password)
+	time_set=qq_zone_crawler.set_time()
 	cookie_zone=qq_zone_crawler.QQ_zone_login()
 	g_tk=qq_zone_crawler.get_g_tk()
 	qq_zone_crawler.QQ_mail_login()
@@ -310,7 +334,7 @@ if __name__ == '__main__':
 	results=[]
 	for i in range(process):
 		try:
-			results.append(p.apply_async(get_info, args=(g_tk,cookie_zone,qq_num)))
+			results.append(p.apply_async(get_info, args=(g_tk,cookie_zone,qq_num,time_set)))
 		except  Exception as e:
 			print(e)
 	p.close()
